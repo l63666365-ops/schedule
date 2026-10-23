@@ -3538,7 +3538,12 @@
         }
 
     </script>
-<style>.week-toggle{display:none!important}#main-grid .item-box{min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}.schedule-card .sc-ruang{display:none!important}</style>
+<style>.week-toggle{display:none!important}.edit-row{position:relative;display:flex;flex-direction:column;gap:10px;padding:16px 12px 12px;background:var(--white);border:1px solid var(--color-4);border-left:4px solid var(--color-3);border-radius:14px;box-shadow:0 2px 4px rgba(var(--shadow-rgb),.04)}
+.edit-row label{display:block;margin-bottom:3px;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--color-2)}
+.edit-row .er-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.edit-row .input-edit{height:38px;box-sizing:border-box;padding:0 10px;font-size:14px;text-align:left}
+.edit-row input[type=time].input-edit{text-align:center}
+.edit-row .btn-delete-row{position:absolute;top:-8px;left:-8px}</style>
 </head>
 
 <body>
@@ -5211,8 +5216,8 @@
                 colMapel.innerHTML = ""; colJam.innerHTML = ""; colRuang.innerHTML = "";
                 if (cardsWrap) cardsWrap.innerHTML = "";
                 // Grid lama (bisa diedit) cuma ditampilkan pas mode edit; sehari-hari yang tampil kartu baru
-                if (grid) grid.style.display = isEditMode ? 'grid' : 'none';
-                if (cardsWrap) cardsWrap.style.display = isEditMode ? 'none' : 'flex';
+                if (grid) grid.style.display = 'none';
+                if (cardsWrap) cardsWrap.style.display = 'flex';
                 const hariIni = jadwalData[currentWeekType][dayName] || [];
                 if (!isEditMode && (isLiburKalender || (isLiburMingguan && hariIni.length === 0))) {
                     colMapel.innerHTML = "<div class='item-box'>Libur</div>";
@@ -5233,13 +5238,21 @@
                         let tp = jamRaw.split('-');
                         let jamStart = (tp[0] || "").trim();
                         let jamEnd = (tp[1] || "").trim();
-                        colMapel.innerHTML += `<div class="item-box" style="position: relative;"><button class="btn-delete-row" onclick="deleteRow(${index})">×</button><input class="input-edit" id="edit-mapel-${index}" placeholder="Mapel Baru" value="${item[0]}"></div>`;
-                        colJam.innerHTML += `<div class="item-box">
-                <input type="time" class="input-edit" id="edit-jam-start-${index}" value="${jamStart}"> 
-                <span style="font-size:10px">s/d</span> 
-                <input type="time" class="input-edit" id="edit-jam-end-${index}" value="${jamEnd}" onchange="syncNextStart(${index})">
-            </div>`;
-                        colRuang.innerHTML += `<div class="item-box"><input class="input-edit" id="edit-guru-${index}" placeholder="Nama guru" value="${((item[3] && item[3] !== '-') ? item[3] : '').replace(/"/g, '&quot;')}"></div>`;
+                        const esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+                        const ruangVal = (item[2] && item[2].trim() !== '-' && item[2].trim() !== '(-)') ? item[2] : '';
+                        const guruVal = (item[3] && item[3].trim() !== '-') ? item[3] : '';
+                        if (cardsWrap) cardsWrap.innerHTML += `<div class="edit-row">
+                            <button class="btn-delete-row" onclick="deleteRow(${index})">×</button>
+                            <div><label>Mapel</label><input class="input-edit" id="edit-mapel-${index}" placeholder="Nama mapel" value="${esc(item[0])}"></div>
+                            <div class="er-pair">
+                                <div><label>Mulai</label><input type="time" class="input-edit" id="edit-jam-start-${index}" value="${jamStart}"></div>
+                                <div><label>Selesai</label><input type="time" class="input-edit" id="edit-jam-end-${index}" value="${jamEnd}" onchange="syncNextStart(${index})"></div>
+                            </div>
+                            <div class="er-pair">
+                                <div><label>Ruang</label><input class="input-edit" id="edit-ruang-${index}" placeholder="-" value="${esc(ruangVal)}"></div>
+                                <div><label>Guru</label><input class="input-edit" id="edit-guru-${index}" placeholder="Nama guru" value="${esc(guruVal)}"></div>
+                            </div>
+                        </div>`;
                     } else {
                         colMapel.innerHTML += `<div class="item-box" id="mapel-${index}">${item[0]}</div>`;
                         let jamCantik = item[1].replace(/\./g, '&thinsp;:&thinsp;').replace('-', ' — ');
@@ -5257,11 +5270,13 @@
                             const guruHtml = namaGuru
                                 ? `<p class="sc-guru"><svg class="sc-guru-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${namaGuru}</p>`
                                 : '';
+                            const ruangOk = item[2] && item[2].trim() !== '-' && item[2].trim() !== '(-)';
+                            const ruangHtml = ruangOk ? `<p class="sc-ruang"><svg class="sc-ruang-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>${item[2] || '-'}</p>` : '';
                             cardsWrap.innerHTML += `<div class="schedule-card" id="card-${index}" data-index="${index}">
                     <p class="sc-time">${jamMulai}<br>${jamSelesai}</p>
                     <div>
                         <p class="sc-mapel">${item[0]}</p>
-                        <p class="sc-ruang"><svg class="sc-ruang-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>${item[2] || '-'}</p>
+                        ${ruangHtml}
                         ${guruHtml}
                     </div>
                 </div>`;
@@ -5320,13 +5335,13 @@
                 const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
                 const dayName = days[currentViewDate.getDay()];
                 const tempJadwal = [];
-                const mapelInputs = document.querySelectorAll('#col-mapel .input-edit');
+                const mapelInputs = document.querySelectorAll('#scheduleCards .edit-row');
                 mapelInputs.forEach((_, index) => {
                     const m = document.getElementById(`edit-mapel-${index}`).value;
                     let js = document.getElementById(`edit-jam-start-${index}`).value.replace(':', '.');
                     let je = document.getElementById(`edit-jam-end-${index}`).value.replace(':', '.');
                     const g = (document.getElementById(`edit-guru-${index}`).value || '').trim();
-                    const r = (((jadwalData[currentWeekType][dayName] || [])[index]) || [])[2] || '-';
+                    const r = (document.getElementById(`edit-ruang-${index}`).value || '').trim() || '-';
                     if (m.trim() !== "") {
                         tempJadwal.push([m, `${js} - ${je}`, r, g || '-']);
                     }
