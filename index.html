@@ -4388,13 +4388,38 @@
             function simpanKelas() {
                 const v = (document.getElementById('kelasInput').value || '').trim().slice(0, 30);
                 if (!v) { showAlert('Oops', 'Nama kelas gak boleh kosong ya'); return; }
+                terapkanKelas(v);
+                batalEditKelas();
+                fetch(`${firebaseTugasURL}/_pengaturan/kelas.json`, { method: 'PUT', body: JSON.stringify(v) })
+                    .then(r => { if (!r.ok) throw new Error('gagal'); })
+                    .catch(() => showAlert('Offline', 'Nama kelas baru kesimpan di HP ini, tapi belum masuk ke server. Cek internet ya.'));
+            }
+
+            // Pasang nama kelas ke tampilan + simpan cadangan di HP
+            function terapkanKelas(v) {
                 KELAS_LABEL = v;
                 try { localStorage.setItem('kelasLabel', v); } catch (e) { }
                 const h = document.getElementById('header-kelas');
                 if (h) h.innerText = v;
                 const pk = document.getElementById('profilKelas');
                 if (pk) pk.innerText = v;
-                batalEditKelas();
+            }
+
+            // Realtime: nama kelas di Firebase (tugas_cloud/_pengaturan/kelas) otomatis ngubah semua HP
+            let kelasEventSource = null;
+            function initKelasSync() {
+                if (typeof EventSource === 'undefined') return;
+                try {
+                    if (kelasEventSource) kelasEventSource.close();
+                    const es = new EventSource(`${firebaseTugasURL}/_pengaturan/kelas.json`);
+                    es.addEventListener('put', e => {
+                        try {
+                            const d = JSON.parse(e.data);
+                            if (d && d.path === '/' && typeof d.data === 'string' && d.data.trim()) terapkanKelas(d.data.trim());
+                        } catch (err) { }
+                    });
+                    kelasEventSource = es;
+                } catch (err) { }
             }
 
             // Elemen fixed (bottom-nav, btn-edit-mode, btnKeluarWrap) sekarang ditaro
@@ -7307,6 +7332,7 @@
                     const viewingKelas = sessionStorage.getItem('adminViewingKelas') || userKelas;
                     headerKelasEl.innerText = KELAS_LABEL;
                 }
+                initKelasSync();
                 // Urutan inisialisasi yang benar:
                 // 1. Set minggu otomatis dulu
                 setAutoWeek();
