@@ -5239,8 +5239,8 @@
                         let jamStart = (tp[0] || "").trim();
                         let jamEnd = (tp[1] || "").trim();
                         const esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
-                        const ruangVal = (item[2] && item[2].trim() !== '-' && item[2].trim() !== '(-)') ? item[2] : '';
-                        const guruVal = (item[3] && item[3].trim() !== '-') ? item[3] : '';
+                        const ruangVal = item[2] || '';
+                        const guruVal = item[3] || '';
                         if (cardsWrap) cardsWrap.innerHTML += `<div class="edit-row">
                             <button class="btn-delete-row" onclick="deleteRow(${index})">×</button>
                             <div><label>Mapel</label><input class="input-edit" id="edit-mapel-${index}" placeholder="Nama mapel" value="${esc(item[0])}"></div>
@@ -5265,13 +5265,11 @@
                             const jamMulai = (jamParts[0] || '').trim().replace(':', ' : ');
                             const jamSelesai = (jamParts[1] || '').trim().replace(':', ' : ');
                             // Pakai data-index supaya checkHighlight bisa match berdasarkan index asli
-                            let namaGuru = (item[3] && item[3].trim()) || MAP_GURU[item[0]] || '';
-                if (namaGuru === '-') namaGuru = '';
+                            let namaGuru = (item[3] && item[3].trim()) || MAP_GURU[item[0]] || '-';
                             const guruHtml = namaGuru
                                 ? `<p class="sc-guru"><svg class="sc-guru-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${namaGuru}</p>`
                                 : '';
-                            const ruangOk = item[2] && item[2].trim() !== '-' && item[2].trim() !== '(-)';
-                            const ruangHtml = ruangOk ? `<p class="sc-ruang"><svg class="sc-ruang-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>${item[2] || '-'}</p>` : '';
+                                                        const ruangHtml = `<p class="sc-ruang"><svg class="sc-ruang-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>${item[2] || '-'}</p>`;
                             cardsWrap.innerHTML += `<div class="schedule-card" id="card-${index}" data-index="${index}">
                     <p class="sc-time">${jamMulai}<br>${jamSelesai}</p>
                     <div>
@@ -5368,7 +5366,7 @@
                     if (lastEnd) startTime = lastEnd;
                 }
                 const endTime = addOneHour(startTime);
-                jadwalData[currentWeekType][dayName].push(["", `${startTime}-${endTime}`, "(-)"]);
+                jadwalData[currentWeekType][dayName].push(["", `${startTime}-${endTime}`, "-", "-"]);
                 renderSchedule();
             }
 
