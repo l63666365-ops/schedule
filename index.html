@@ -4059,6 +4059,268 @@
                 }).join('\n');
             }
 
+            // =====================================================================
+            //  PENCOCOKAN NAMA MAPEL PINTAR
+            //  Tugas gak perlu nulis nama mapel persis kayak di jadwal. Contoh:
+            //    "Bahasa Indonesia" -> ind, indo, b.indo, B Indo, bhs indo, bindo, ...
+            //    "PPKn"             -> pkn, PKn, ppkn, p.pkn, pancasila, ...
+            //    "Matematika"       -> mat, mtk, math, matematka (typo 1 huruf), ...
+            //  Cara kerja (semua otomatis dari nama mapel di jadwal/Sheets):
+            //   1. Nama lengkap tetap dicocokkan seperti dulu (gak ada yang berubah).
+            //   2. Alias dibuat otomatis: singkatan awalan kata, inisial, "b/bhs + kata",
+            //      ditambah daftar alias manual di ALIAS_MAPEL_MANUAL di bawah.
+            //   3. Alias "any"  = dikenali di mana pun dalam teks tugas.
+            //      Alias "awal" = hanya kalau ada di awal baris / sebelum tanda ":"
+            //      (buat singkatan pendek/kata umum, biar "Pulau Jawa" di tugas IPS
+            //      gak salah dikira mapel Bahasa Jawa).
+            //   4. Typo kecil (selisih 1-2 huruf) di kata panjang tetap dikenali.
+            //   5. Kalau satu alias bisa milik 2 mapel berbeda, alias itu dibuang
+            //      (dianggap ambigu) biar tugas gak nyasar ke mapel yang salah.
+            //  Mau nambah alias sendiri? Cukup tambah di ALIAS_MAPEL_MANUAL.
+            //  Kunci = nama mapel di jadwal, huruf kecil. any/awal = daftar alias.
+            // =====================================================================
+            const ALIAS_MAPEL_MANUAL = {
+                'bahasa indonesia': {
+                    any: ['indo', 'ind', 'b indo', 'bindo', 'b ind', 'bhs indo', 'bhs ind', 'bhsindo', 'bahasa indo', 'b indonesia', 'bhs indonesia'],
+                    awal: ['indonesia', 'bi', 'bin', 'b in']
+                },
+                'bahasa inggris': {
+                    any: ['ing', 'ingg', 'english', 'eng', 'b ing', 'b ingg', 'bing', 'bhs ing', 'bhs ingg', 'bhs inggris', 'bahasa ing', 'b inggris', 'binggris'],
+                    awal: ['inggris', 'big']
+                },
+                'bahasa jawa': {
+                    any: ['b jawa', 'bjawa', 'b jaw', 'b jw', 'bjw', 'bhs jawa', 'bhs jaw', 'bhs jw', 'basa jawa', 'basa jaw'],
+                    awal: ['jawa', 'jaw', 'jw', 'bj']
+                },
+                'ppkn': {
+                    any: ['pkn', 'pp kn', 'p pkn', 'pancasila', 'kewarganegaraan', 'pendidikan pancasila'],
+                    awal: ['pp']
+                },
+                'pkn': { any: ['ppkn', 'pp kn', 'pancasila', 'kewarganegaraan'], awal: [] },
+                'matematika': {
+                    any: ['mat', 'mtk', 'mate', 'matem', 'math', 'matematik'],
+                    awal: ['mt']
+                },
+                'pjok': {
+                    any: ['pjk', 'penjas', 'penjaskes', 'penjasorkes', 'olahraga', 'orkes'],
+                    awal: ['pj']
+                },
+                'seni rupa': {
+                    any: ['senirupa', 'seni', 'sbk', 'sbdp', 'seni budaya'],
+                    awal: ['sr']
+                },
+                'agama': {
+                    any: ['agm', 'pai', 'pabp', 'pendidikan agama', 'agama islam', 'islam'],
+                    awal: []
+                },
+                'pendidikan agama islam': { any: ['pai', 'pabp', 'agama', 'agama islam', 'islam'], awal: [] },
+                'upacara': {
+                    any: ['upc', 'upacara bendera'],
+                    awal: ['up']
+                },
+                'ipa': { any: ['sains', 'ilmu pengetahuan alam'], awal: [] },
+                'ips': { any: ['ilmu pengetahuan sosial'], awal: [] },
+                'informatika': { any: ['tik', 'komputer'], awal: ['info'] },
+                'sejarah': { any: [], awal: ['sej', 'sjr'] }
+            };
+
+            // Kata pembuka yang sering nongol di awal baris tugas sebelum nama mapel
+            // ("Tugas ind: ...", "PR mat hal 5") -> dilewati waktu cek alias "awal".
+            const MAPEL_KATA_PEMBUKA = new Set(['tugas', 'pr', 'kerjakan', 'kerjain', 'mengerjakan', 'ngerjain', 'besok', 'ada', 'buat', 'bikin', 'no', 'nomor']);
+            const MAPEL_STOPWORD = new Set(['bahasa', 'bhs', 'basa', 'pendidikan', 'pelajaran', 'dan', 'ilmu', 'pengetahuan', 'mata', 'mapel', 'wajib', 'pilihan']);
+
+            // Huruf kecil, semua tanda baca/simbol jadi spasi: "B.Indo" -> "b indo"
+            function normMapelText(s) {
+                return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+            }
+
+            // Jarak edit (Levenshtein) sederhana buat toleransi typo
+            function mapelEditDistance(a, b, maks) {
+                if (Math.abs(a.length - b.length) > maks) return maks + 1;
+                let prev = [];
+                for (let j = 0; j <= b.length; j++) prev.push(j);
+                for (let i = 1; i <= a.length; i++) {
+                    const cur = [i];
+                    let minBaris = i;
+                    for (let j = 1; j <= b.length; j++) {
+                        const biaya = a[i - 1] === b[j - 1] ? 0 : 1;
+                        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + biaya);
+                        if (cur[j] < minBaris) minBaris = cur[j];
+                    }
+                    if (minBaris > maks) return maks + 1;
+                    prev = cur;
+                }
+                return prev[b.length];
+            }
+
+            // Bikin alias (any/awal) untuk 1 nama mapel yang sudah dinormalisasi
+            function buatAliasMapel(n) {
+                const any = new Set(), awal = new Set();
+                const words = n.split(' ').filter(Boolean);
+                if (words.length === 0) return { any: [], awal: [], fuzzy: [] };
+                const compact = words.join('');
+                any.add(n);
+                any.add(compact);
+
+                // alias manual
+                const man = ALIAS_MAPEL_MANUAL[n];
+                if (man) {
+                    (man.any || []).forEach(a => { const x = normMapelText(a); if (x) any.add(x); });
+                    (man.awal || []).forEach(a => { const x = normMapelText(a); if (x) awal.add(x); });
+                }
+
+                const isBhs = ['bahasa', 'bhs', 'basa'].indexOf(words[0]) >= 0;
+                const sig = words.filter(w => !MAPEL_STOPWORD.has(w));
+                const awalan = w => { const o = []; for (let i = 3; i < w.length; i++) o.push(w.slice(0, i)); return o; };
+
+                // "Bahasa X" -> "b x", "bhs x", "bahasa x", "basa x" (+ versi nempel), X boleh disingkat
+                if (isBhs) {
+                    const bForms = ['b', 'bhs', 'bahasa', 'basa'];
+                    sig.forEach(w => {
+                        [w].concat(awalan(w)).forEach(p => {
+                            bForms.forEach(b => {
+                                any.add(b + ' ' + p);
+                                // "bing"/"bind" (b + 3 huruf) terlalu pendek -> cuma di awal baris
+                                ((b === 'b' && p.length < 4) ? awal : any).add(b + p);
+                            });
+                        });
+                    });
+                }
+
+                // kata inti & singkatannya (mis. matematika -> mat, mate, matem ...) -> awal baris
+                sig.forEach(w => {
+                    if (w.length >= 3) awal.add(w);
+                    awalan(w).forEach(p => awal.add(p));
+                });
+
+                // inisial nama panjang (ilmu pengetahuan alam -> ipa, seni rupa -> sr)
+                if (!isBhs && words.length >= 2) {
+                    const ini = words.map(w => w[0]).join('');
+                    (ini.length >= 3 ? any : awal).add(ini);
+                }
+
+                // alias "any" yang kependekan (<3 huruf) diturunin jadi "awal"; 1 huruf dibuang
+                Array.from(any).forEach(a => {
+                    const len = a.replace(/ /g, '').length;
+                    if (a !== n && a !== compact && len < 3) { any.delete(a); if (len >= 2) awal.add(a); }
+                });
+                Array.from(awal).forEach(a => { if (a.replace(/ /g, '').length < 2) awal.delete(a); });
+                // yang sudah ada di "any" gak perlu dobel di "awal"
+                any.forEach(a => awal.delete(a));
+
+                const fuzzy = Array.from(any).filter(a => a.indexOf(' ') < 0 && a.length >= 5);
+                return { any: Array.from(any), awal: Array.from(awal), fuzzy: fuzzy };
+            }
+
+            // Index alias semua mapel di jadwal (dibuang kalau ambigu antar-mapel).
+            // Dibangun ulang otomatis kalau daftar mapel di jadwal berubah.
+            let _mapelAliasIndex = null;
+            const _mapelAliasAdhoc = {};
+            function getAliasMapel(n) {
+                const names = new Set();
+                try {
+                    ['m1', 'm2'].forEach(w => {
+                        const wk = jadwalData && jadwalData[w];
+                        if (!wk) return;
+                        Object.keys(wk).forEach(h => (wk[h] || []).forEach(it => {
+                            const x = normMapelText(it && it[0]);
+                            if (x) names.add(x);
+                        }));
+                    });
+                } catch (e) { /* jadwalData belum siap -> pakai alias dadakan */ }
+                const key = Array.from(names).sort().join('|');
+                if (!_mapelAliasIndex || _mapelAliasIndex.key !== key) {
+                    const per = {};
+                    const pemilik = {};
+                    names.forEach(nm => {
+                        per[nm] = buatAliasMapel(nm);
+                        per[nm].any.concat(per[nm].awal).forEach(a => { (pemilik[a] = pemilik[a] || new Set()).add(nm); });
+                    });
+                    names.forEach(nm => {
+                        const compact = nm.replace(/ /g, '');
+                        const ok = a => a === nm || a === compact || pemilik[a].size === 1;
+                        per[nm] = {
+                            any: per[nm].any.filter(ok),
+                            awal: per[nm].awal.filter(ok),
+                            fuzzy: per[nm].fuzzy.filter(ok)
+                        };
+                    });
+                    _mapelAliasIndex = { key: key, per: per };
+                }
+                if (_mapelAliasIndex.per[n]) return _mapelAliasIndex.per[n];
+                return _mapelAliasAdhoc[n] || (_mapelAliasAdhoc[n] = buatAliasMapel(n));
+            }
+
+            // Inti: apakah teks tugas (huruf kecil, tanpa format) menyebut mapel ini?
+            // Dipakai buat urutan tugas, badge HARI INI/BESOK, dan badge di kartu jadwal.
+            function mapelCocokTeks(namaMapel, teks) {
+                const raw = String(namaMapel == null ? '' : namaMapel).toLowerCase().trim();
+                if (!raw || !teks) return false;
+
+                // 1) cara lama: nama lengkap persis -> tetap jalan
+                try {
+                    const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    if (new RegExp('\\b' + esc + '\\b', 'i').test(teks) || teks.indexOf(raw + ':') >= 0) return true;
+                } catch (e) { }
+
+                const n = normMapelText(raw);
+                if (!n) return false;
+                const ent = getAliasMapel(n);
+                const norm = normMapelText(teks);
+                if (!norm) return false;
+
+                // 2) alias "any": nongol di mana aja sebagai kata utuh
+                const padded = ' ' + norm + ' ';
+                for (let i = 0; i < ent.any.length; i++) {
+                    if (padded.indexOf(' ' + ent.any[i] + ' ') >= 0) return true;
+                }
+
+                // 3) alias "awal": awal baris, atau tepat sebelum tanda ":"
+                if (ent.awal.length) {
+                    const lines = teks.split('\n');
+                    for (let li = 0; li < lines.length; li++) {
+                        const line = lines[li];
+                        const tok = normMapelText(line).split(' ').filter(Boolean);
+                        while (tok.length && (/^\d+$/.test(tok[0]) || MAPEL_KATA_PEMBUKA.has(tok[0]))) tok.shift();
+                        const awalBaris = ' ' + tok.join(' ') + ' ';
+                        for (let i = 0; i < ent.awal.length; i++) {
+                            if (awalBaris.indexOf(' ' + ent.awal[i] + ' ') === 0) return true;
+                        }
+                        if (line.indexOf(':') >= 0) {
+                            const segs = line.split(':');
+                            segs.pop();
+                            for (let si = 0; si < segs.length; si++) {
+                                const parts = segs[si].split(/[,;&+\/]| dan /);
+                                for (let pi = 0; pi < parts.length; pi++) {
+                                    const P = normMapelText(parts[pi]);
+                                    if (!P) continue;
+                                    for (let i = 0; i < ent.awal.length; i++) {
+                                        const a = ent.awal[i];
+                                        if (P === a || P.slice(-(a.length + 1)) === ' ' + a) return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4) typo kecil di kata panjang (mis. "matematka", "pendidkan")
+                if (ent.fuzzy.length) {
+                    const tokens = norm.split(' ');
+                    for (let ti = 0; ti < tokens.length; ti++) {
+                        const t = tokens[ti];
+                        if (t.length < 5) continue;
+                        for (let fi = 0; fi < ent.fuzzy.length; fi++) {
+                            const f = ent.fuzzy[fi];
+                            if (t[0] !== f[0]) continue;
+                            if (mapelEditDistance(t, f, f.length >= 9 ? 2 : 1) <= (f.length >= 9 ? 2 : 1)) return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+
             // ----- Toolbar & pintasan keyboard di kotak ketik -----
             // Pakai execCommand('insertText') (bukan set .value langsung) biar riwayat
             // undo (Ctrl+Z) tetap jalan; setRangeText jadi cadangan kalau gak didukung.
@@ -5938,8 +6200,7 @@
                     const teks = plainTaskText(t.text).toLowerCase();
                     let urutan = 999;
                     daftarMapelBesok.forEach((mapel, index) => {
-                        const regex = new RegExp("\\b" + mapel + "\\b", "i");
-                        if (regex.test(teks) || teks.includes(mapel + ":")) {
+                        if (mapelCocokTeks(mapel, teks)) {
                             urutan = Math.min(urutan, index);
                         }
                     });
@@ -6036,11 +6297,9 @@
                     if (!mapelEl) return;
                     const mapel = mapelEl.textContent.toLowerCase().trim();
                     if (!mapel) return;
-                    const mapelEscaped = mapel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp("\\b" + mapelEscaped + "\\b", "i");
                     const cocokTasks = tugasAktif.filter(t => {
                         const teks = plainTaskText(t.text).toLowerCase();
-                        return regex.test(teks) || teks.includes(mapel + ":");
+                        return mapelCocokTeks(mapel, teks);
                     });
                     if (cocokTasks.length > 0) {
                         card.classList.add('has-task');
