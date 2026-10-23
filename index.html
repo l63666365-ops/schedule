@@ -3861,6 +3861,12 @@
                     <p style="font-size: 11px; color: var(--color-3); font-weight: 800; margin: 0; letter-spacing: 0.5px;">KELAS</p>
                     <p id="profilKelas" style="font-size: 22px; font-weight: 800; color: var(--color-2); margin: 4px 0 0;">-</p>
                     <p id="profilRole" style="font-size: 12px; color: var(--color-3); margin: 6px 0 0;">-</p>
+                    <button id="btnUbahKelas" onclick="mulaiEditKelas()" style="margin-top: 14px; background: transparent; border: 1.5px solid var(--color-3); color: var(--color-2); border-radius: 999px; padding: 7px 16px; font-weight: 700; font-size: 12px; font-family: inherit; cursor: pointer;">✎ Ubah kelas</button>
+                    <div id="kelasEditRow" style="display: none; gap: 8px; width: 100%; margin-top: 14px; align-items: center;">
+                        <input id="kelasInput" maxlength="30" placeholder="Contoh: Kelas 6 SD" onkeydown="if(event.key==='Enter')simpanKelas()" style="flex: 1; min-width: 0; height: 42px; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--color-3); background: var(--white); color: var(--color-1); font-size: 15px; font-weight: 700; font-family: inherit; box-sizing: border-box;">
+                        <button onclick="simpanKelas()" style="height: 42px; padding: 0 14px; border: none; border-radius: 10px; background: var(--color-2); color: #fff; font-weight: 800; font-size: 13px; font-family: inherit; cursor: pointer;">Simpan</button>
+                        <button onclick="batalEditKelas()" style="height: 42px; padding: 0 12px; border: 1.5px solid var(--color-3); border-radius: 10px; background: transparent; color: var(--color-2); font-weight: 700; font-size: 13px; font-family: inherit; cursor: pointer;">Batal</button>
+                    </div>
                 </div>
 
                 <!-- PENGATURAN -->
@@ -4300,7 +4306,7 @@
             const JAM_GANTI_HARI = 17;
 
             // ===== MODE SISWA TUNGGAL (tanpa login, 1 kelas, tanpa Minggu 1/2) =====
-            const KELAS_LABEL = 'Kelas 6 SD';
+            let KELAS_LABEL = (function () { try { return localStorage.getItem('kelasLabel') || 'Kelas 6 SD'; } catch (e) { return 'Kelas 6 SD'; } })();
             // URL web app Google Apps Script (Sheet jadwal adik). Isi setelah deploy, lihat apps-script.gs
             const URL_GAS = "https://script.google.com/macros/s/AKfycbwT5Z7H_IEGRcHg7PKNtQrqzKo8jnwNqXy4hdC1JmfWnDKRuLYlz4zDHSv7yHfqpCxF8w/exec";
             (function setupSiswa() {
@@ -4361,6 +4367,34 @@
                     updateProfilAccentUI();
                 }
                 syncFixedNavButtons();
+            }
+
+            // ===== Ubah nama kelas dari tab Profil (disimpan di HP ini) =====
+            function mulaiEditKelas() {
+                const row = document.getElementById('kelasEditRow');
+                const inp = document.getElementById('kelasInput');
+                document.getElementById('btnUbahKelas').style.display = 'none';
+                row.style.display = 'flex';
+                inp.value = KELAS_LABEL;
+                inp.focus();
+                inp.select();
+            }
+
+            function batalEditKelas() {
+                document.getElementById('kelasEditRow').style.display = 'none';
+                document.getElementById('btnUbahKelas').style.display = '';
+            }
+
+            function simpanKelas() {
+                const v = (document.getElementById('kelasInput').value || '').trim().slice(0, 30);
+                if (!v) { showAlert('Oops', 'Nama kelas gak boleh kosong ya'); return; }
+                KELAS_LABEL = v;
+                try { localStorage.setItem('kelasLabel', v); } catch (e) { }
+                const h = document.getElementById('header-kelas');
+                if (h) h.innerText = v;
+                const pk = document.getElementById('profilKelas');
+                if (pk) pk.innerText = v;
+                batalEditKelas();
             }
 
             // Elemen fixed (bottom-nav, btn-edit-mode, btnKeluarWrap) sekarang ditaro
