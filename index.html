@@ -3538,7 +3538,7 @@
         }
 
     </script>
-<style>.week-toggle{display:none!important}.schedule-card .sc-ruang{display:none!important}</style>
+<style>.week-toggle{display:none!important}#main-grid .item-box{min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center}.schedule-card .sc-ruang{display:none!important}</style>
 </head>
 
 <body>
@@ -3738,7 +3738,7 @@
                 <div class="schedule-grid" id="main-grid" style="width: 100%; display: none;">
                     <div class="grid-header">Mapel</div>
                     <div class="grid-header">Jam</div>
-                    <div class="grid-header">Ruang</div>
+                    <div class="grid-header">Guru</div>
                     <div class="grid-column" id="col-mapel"></div>
                     <div class="grid-column" id="col-jam"></div>
                     <div class="grid-column" id="col-ruang"></div>
@@ -5239,7 +5239,7 @@
                 <span style="font-size:10px">s/d</span> 
                 <input type="time" class="input-edit" id="edit-jam-end-${index}" value="${jamEnd}" onchange="syncNextStart(${index})">
             </div>`;
-                        colRuang.innerHTML += `<div class="item-box"><input class="input-edit" id="edit-ruang-${index}" value="${item[2]}"></div>`;
+                        colRuang.innerHTML += `<div class="item-box"><input class="input-edit" id="edit-guru-${index}" placeholder="Nama guru" value="${((item[3] && item[3] !== '-') ? item[3] : '').replace(/"/g, '&quot;')}"></div>`;
                     } else {
                         colMapel.innerHTML += `<div class="item-box" id="mapel-${index}">${item[0]}</div>`;
                         let jamCantik = item[1].replace(/\./g, '&thinsp;:&thinsp;').replace('-', ' — ');
@@ -5252,7 +5252,8 @@
                             const jamMulai = (jamParts[0] || '').trim().replace(':', ' : ');
                             const jamSelesai = (jamParts[1] || '').trim().replace(':', ' : ');
                             // Pakai data-index supaya checkHighlight bisa match berdasarkan index asli
-                            const namaGuru = (item[3] && item[3].trim()) || MAP_GURU[item[0]] || '';
+                            let namaGuru = (item[3] && item[3].trim()) || MAP_GURU[item[0]] || '';
+                if (namaGuru === '-') namaGuru = '';
                             const guruHtml = namaGuru
                                 ? `<p class="sc-guru"><svg class="sc-guru-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${namaGuru}</p>`
                                 : '';
@@ -5324,9 +5325,10 @@
                     const m = document.getElementById(`edit-mapel-${index}`).value;
                     let js = document.getElementById(`edit-jam-start-${index}`).value.replace(':', '.');
                     let je = document.getElementById(`edit-jam-end-${index}`).value.replace(':', '.');
-                    const r = document.getElementById(`edit-ruang-${index}`).value;
+                    const g = (document.getElementById(`edit-guru-${index}`).value || '').trim();
+                    const r = (((jadwalData[currentWeekType][dayName] || [])[index]) || [])[2] || '-';
                     if (m.trim() !== "") {
-                        tempJadwal.push([m, `${js} - ${je}`, r]);
+                        tempJadwal.push([m, `${js} - ${je}`, r, g || '-']);
                     }
                 });
                 jadwalData[currentWeekType][dayName] = tempJadwal;
