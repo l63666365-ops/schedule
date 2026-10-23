@@ -3274,6 +3274,22 @@
         }
     </style>
     <script>
+        // ===== Isolasi storage versi SD =====
+        // localStorage/sessionStorage itu per-DOMAIN (bukan per-folder). Aplikasi TKJ 2
+        // (/Skuy/) & versi SD ini sama-sama di *.github.io yang sama, jadi key-nya
+        // (userKelas, role, isLoggedIn, savedJadwal, mySchoolTasks, dst) sempat saling timpa.
+        // Semua key versi SD diberi prefix 'sd6_' biar gak nabrak. WAJIB paling atas.
+        (function () {
+            var P = 'sd6_';
+            var get = Storage.prototype.getItem;
+            var set = Storage.prototype.setItem;
+            var rem = Storage.prototype.removeItem;
+            Storage.prototype.getItem = function (k) { return get.call(this, P + k); };
+            Storage.prototype.setItem = function (k, v) { return set.call(this, P + k, v); };
+            Storage.prototype.removeItem = function (k) { return rem.call(this, P + k); };
+        })();
+    </script>
+    <script>
         // ===== Cegah scroll dipaksa balik ke (0,0) dari luar kode kita =====
         // Ketemu lewat debugging: ada sesuatu di luar kode kita (kemungkinan besar fitur
         // WebToApp seperti Floating Back Button / Long Press Menu) yang berulang kali manggil
